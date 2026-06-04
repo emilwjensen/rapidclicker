@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Generate a branded DMG background (1x + @2x) for RapidClicker."""
+"""Render a premium DMG background for RapidClicker at 1x and 2x (Retina).
+
+Outputs build/dmgassets/background.png and background@2x.png. The DMG build
+script combines them into a HiDPI .tiff so text stays crisp on Retina displays.
+"""
 import os
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 ICON = "RapidClicker/Assets.xcassets/AppIcon.appiconset/1024-mac.png"
 OUT = "build/dmgassets"
 os.makedirs(OUT, exist_ok=True)
 
-W, H = 640, 420  # window content size in points
+W, H = 680, 446  # window content size in points
 
 def font(paths, size):
     for p in paths:
@@ -17,11 +21,10 @@ def font(paths, size):
             continue
     return ImageFont.load_default()
 
-BOLD = ["/System/Library/Fonts/SFNSRounded.ttf",
-        "/System/Library/Fonts/SFNS.ttf",
-        "/System/Library/Fonts/Supplemental/Arial Bold.ttf"]
-REG = ["/System/Library/Fonts/SFNSRounded.ttf",
-       "/System/Library/Fonts/SFNS.ttf",
+ROUND = ["/System/Library/Fonts/SFNSRounded.ttf",
+         "/System/Library/Fonts/SFCompactRounded.ttf",
+         "/System/Library/Fonts/Supplemental/Arial Bold.ttf"]
+REG = ["/System/Library/Fonts/SFNS.ttf",
        "/System/Library/Fonts/Supplemental/Arial.ttf"]
 
 def lerp(a, b, t):
@@ -38,64 +41,82 @@ c_br = sample(0.70, 0.74)
 if min(c_tl) > 205:
     c_tl = (78, 96, 240)
 if min(c_br) > 205:
-    c_br = (196, 36, 216)
+    c_br = (206, 31, 240)
 
 def gradient(w, h):
-    gw, gh = 90, 60
+    gw, gh = 200, 132
     g = Image.new("RGB", (gw, gh))
+    px = g.load()
     for j in range(gh):
         for i in range(gw):
             t = (i / (gw - 1) + j / (gh - 1)) / 2
-            g.putpixel((i, j), lerp(c_tl, c_br, t))
+            px[i, j] = lerp(c_tl, c_br, t)
     return g.resize((w, h), Image.BICUBIC)
 
 def render(s):
     img = gradient(W * s, H * s).convert("RGB")
+
+    # subtle top highlight for depth
+    glow = Image.new("L", (W * s, H * s), 0)
+    gd = ImageDraw.Draw(glow)
+    gd.ellipse([W * s * 0.18, -H * s * 0.55, W * s * 0.82, H * s * 0.45], fill=70)
+    glow = glow.filter(ImageFilter.GaussianBlur(60 * s))
+    white = Image.new("RGB", img.size, (255, 255, 255))
+    img = Image.composite(white, img, glow.point(lambda v: int(v * 0.5)))
+
     d = ImageDraw.Draw(img, "RGBA")
+    f_title = font(ROUND, 40 * s)
+    f_tag = font(REG, 16 * s)
+    f_caption = font(ROUND, 18 * s)
+    f_footer = font(REG, 15 * s)
 
-    f_title = font(BOLD, 34 * s)
-    f_caption = font(REG, 17 * s)
-    f_footer = font(REG, 16 * s)
-
-    # --- soft drop shadow + white install card ---
-    card = [60 * s, 150 * s, 580 * s, 312 * s]
+    # --- install card: soft shadow + vertical-gradient white panel ---
+    card = (48 * s, 168 * s, 632 * s, 364 * s)
+    radius = 36 * s
     shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
     sd = ImageDraw.Draw(shadow)
-    sd.rounded_rectangle([card[0], card[1] + 6 * s, card[2], card[3] + 6 * s],
-                         radius=28 * s, fill=(20, 10, 40, 90))
-    from PIL import ImageFilter
-    shadow = shadow.filter(ImageFilter.GaussianBlur(10 * s))
+    sd.rounded_rectangle([card[0], card[1] + 10 * s, card[2], card[3] + 10 * s],
+                         radius=radius, fill=(15, 6, 35, 95))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(16 * s))
     img.paste(shadow, (0, 0), shadow)
-    d.rounded_rectangle(card, radius=28 * s, fill=(255, 255, 255, 235))
 
-    # --- header: icon + title, centered ---
-    ic = 46 * s
-    thumb = icon.resize((ic, ic), Image.LANCZOS)
-    title = "RapidClicker"
-    tw = d.textlength(title, font=f_title)
-    gap = 12 * s
-    total = ic + gap + tw
-    x0 = (W * s - total) / 2
-    cy = 56 * s
-    img.paste(thumb, (int(x0), int(cy - ic / 2)), thumb)
-    d.text((x0 + ic + gap, cy), title, font=f_title, fill=(255, 255, 255, 255), anchor="lm")
+    cw, ch = int(card[2] - card[0]), int(card[3] - card[1])
+    panel = Image.new("RGB", (cw, ch))
+    pp = panel.load()
+    for y in range(ch):
+        col = lerp((255, 255, 255), (246, 246, 250), y / max(ch - 1, 1))
+        for x in range(cw):
+            pp[x, y] = col
+    mask = Image.new("L", (cw, ch), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, cw - 1, ch - 1], radius=radius, fill=255)
+    img.paste(panel, (int(card[0]), int(card[1])), mask)
 
-    # --- caption + arrow between the two icon slots ---
-    d.text((320 * s, 184 * s), "Drag to install", font=f_caption,
-           fill=(70, 70, 90, 255), anchor="mm")
-    ax0, ax1, ay = 256 * s, 384 * s, 224 * s
-    arrow_col = (c_br[0], c_br[1], c_br[2], 255)
-    d.line([(ax0, ay), (ax1 - 10 * s, ay)], fill=arrow_col, width=4 * s)
-    d.polygon([(ax1, ay), (ax1 - 16 * s, ay - 9 * s), (ax1 - 16 * s, ay + 9 * s)],
-              fill=arrow_col)
+    d = ImageDraw.Draw(img, "RGBA")
+
+    # --- title wordmark (no icon) + tagline ---
+    d.text((W * s / 2, 72 * s), "RapidClicker", font=f_title,
+           fill=(255, 255, 255, 255), anchor="mm")
+    d.text((W * s / 2, 108 * s), "Simple macOS auto-clicker", font=f_tag,
+           fill=(255, 255, 255, 180), anchor="mm")
+
+    # --- caption + arrow in the gap between the icon slots ---
+    d.text((340 * s, 214 * s), "Drag to install", font=f_caption,
+           fill=(64, 66, 86, 255), anchor="mm")
+    ay = 254 * s
+    ax0, ax1 = 282 * s, 402 * s
+    col = (c_br[0], c_br[1], c_br[2], 255)
+    d.line([(ax0, ay), (ax1 - 12 * s, ay)], fill=col, width=5 * s)
+    r = int(2.5 * s)
+    d.ellipse([ax0 - r, ay - r, ax0 + r, ay + r], fill=col)
+    d.polygon([(ax1, ay), (ax1 - 18 * s, ay - 10 * s), (ax1 - 18 * s, ay + 10 * s)], fill=col)
 
     # --- footer ---
-    d.text((320 * s, 392 * s), "built by EWJ", font=f_footer,
-           fill=(255, 255, 255, 220), anchor="mm")
+    d.text((W * s / 2, 410 * s), "built by EWJ", font=f_footer,
+           fill=(255, 255, 255, 195), anchor="mm")
 
     return img
 
 render(1).save(f"{OUT}/background.png")
 render(2).save(f"{OUT}/background@2x.png")
 print("gradient", c_tl, "->", c_br)
-print("wrote", OUT + "/background.png (640x420) and @2x (1280x840)")
+print(f"wrote {OUT}/background.png ({W}x{H}) and @2x ({W*2}x{H*2})")
