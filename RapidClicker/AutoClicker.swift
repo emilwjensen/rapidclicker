@@ -20,6 +20,9 @@ final class AutoClicker {
                                       qos: .userInteractive)
     private let eventSource = CGEventSource(stateID: .combinedSessionState)
 
+    /// Number of clicks posted since the last reset. Mutated only on `queue`.
+    private var count = 0
+
     /// Whether the clicker is currently firing. Mutated only from the main thread.
     private(set) var isRunning = false
 
@@ -41,6 +44,12 @@ final class AutoClicker {
         isRunning = false
     }
 
+    /// Clicks posted since the last `resetCount()`.
+    func currentCount() -> Int { queue.sync { count } }
+
+    /// Resets the click counter to zero.
+    func resetCount() { queue.sync { count = 0 } }
+
     /// Posts a single left-button down/up at the pointer's current position.
     private func click() {
         guard let location = CGEvent(source: nil)?.location else { return }
@@ -51,5 +60,6 @@ final class AutoClicker {
                     mouseButton: .left)?
                 .post(tap: .cghidEventTap)
         }
+        count += 1
     }
 }

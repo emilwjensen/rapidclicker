@@ -20,6 +20,9 @@ final class ClickerModel {
     /// Whether the auto-clicker is currently firing.
     private(set) var isRunning = false
 
+    /// Clicks sent in the current run (live; resets each time clicking starts).
+    private(set) var clicksSent = 0
+
     /// Seconds between synthesized clicks (kept within `intervalRange`).
     var interval: TimeInterval {
         didSet {
@@ -52,7 +55,7 @@ final class ClickerModel {
     // MARK: - Constants
 
     /// User-facing click-rate range, in clicks per second.
-    static let rateRange: ClosedRange<Double> = 1...1000
+    static let rateRange: ClosedRange<Double> = 1...100
 
     /// Allowed interval range (seconds), derived from `rateRange`.
     static let intervalRange: ClosedRange<TimeInterval> =
@@ -63,6 +66,7 @@ final class ClickerModel {
     @ObservationIgnored private let clicker = AutoClicker()
     @ObservationIgnored private let hotKey = HotKeyManager()
     @ObservationIgnored private let defaults = UserDefaults.standard
+    @ObservationIgnored private var displayTimer: Timer?
 
     private enum Keys {
         static let modifiers = "savedModifiers"
@@ -81,7 +85,7 @@ final class ClickerModel {
             defaults.set("A", forKey: Keys.key)
         }
 
-        let savedInterval = defaults.object(forKey: Keys.interval) as? TimeInterval ?? 0.01
+        let savedInterval = defaults.object(forKey: Keys.interval) as? TimeInterval ?? 0.1
         interval = min(max(savedInterval, Self.intervalRange.lowerBound), Self.intervalRange.upperBound)
         modifierMask = UInt32(defaults.integer(forKey: Keys.modifiers))
         keyLetter = defaults.string(forKey: Keys.key) ?? "A"
@@ -105,10 +109,29 @@ final class ClickerModel {
     func toggle() {
         if isRunning {
             clicker.stop()
+            stopDisplayUpdates()
         } else {
+            clicker.resetCount()
+            clicksSent = 0
             clicker.start(interval: interval)
+            startDisplayUpdates()
         }
         isRunning = clicker.isRunning
+    }
+
+    /// Polls the engine a few times a second to surface a live click count.
+    private func startDisplayUpdates() {
+        displayTimer?.invalidate()
+        displayTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            self.clicksSent = self.clicker.currentCount()
+        }
+    }
+
+    private func stopDisplayUpdates() {
+        displayTimer?.invalidate()
+        displayTimer = nil
+        clicksSent = clicker.currentCount()
     }
 
     // MARK: - Derived display values

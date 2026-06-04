@@ -10,6 +10,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(ClickerModel.self) private var model
+    @State private var pulse = false
 
     /// While permission is missing, re-check periodically so the banner clears
     /// as soon as the user enables it in System Settings.
@@ -91,6 +92,12 @@ struct ContentView: View {
             .buttonStyle(.borderedProminent)
             .tint(model.isRunning ? .red : .green)
             .keyboardShortcut(.defaultAction)
+            .disabled(!model.accessibilityTrusted)
+            .help(model.accessibilityTrusted
+                  ? "Start or stop clicking (or use your hotkey)."
+                  : "Grant Accessibility permission first — clicks can't be sent without it.")
+
+            statusLine
 
             Text("built by EWJ")
                 .font(.caption2)
@@ -100,6 +107,28 @@ struct ContentView: View {
         .frame(width: 360)
         .onReceive(permissionTimer) { _ in
             if !model.accessibilityTrusted { model.refreshAccessibility() }
+        }
+    }
+
+    /// Live status under the Start button: pulses and counts while running.
+    private var statusLine: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(model.isRunning ? Color.green : Color.secondary.opacity(0.4))
+                .frame(width: 7, height: 7)
+                .opacity(model.isRunning && pulse ? 0.3 : 1)
+                .animation(model.isRunning
+                           ? .easeInOut(duration: 0.6).repeatForever(autoreverses: true)
+                           : .default,
+                           value: pulse)
+            Text(model.isRunning ? "Clicking — \(model.clicksSent) sent" : "Idle")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .contentTransition(.numericText())
+                .animation(.snappy, value: model.clicksSent)
+        }
+        .onChange(of: model.isRunning) { _, running in
+            pulse = running
         }
     }
 

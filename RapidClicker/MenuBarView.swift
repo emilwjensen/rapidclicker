@@ -34,11 +34,17 @@ struct MenuBarView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(model.isRunning ? .red : .green)
+            .disabled(!model.accessibilityTrusted)
+            .help(model.accessibilityTrusted
+                  ? "Start or stop clicking."
+                  : "Grant Accessibility permission first — clicks can't be sent without it.")
 
             VStack(spacing: 4) {
                 row("Rate", "\(model.roundedRate)/sec")
-                row("Interval", model.intervalDescription)
                 row("Hotkey", model.hotKeyDescription)
+                if model.isRunning {
+                    row("Sent", "\(model.clicksSent)")
+                }
             }
             .font(.callout)
 
