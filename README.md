@@ -10,17 +10,19 @@ until you stop it, or until it hits your auto-stop limit.
 
 ## Download & install
 
-1. Go to the [**latest release**](https://github.com/emilwjensen/rapidclicker/releases/latest)
-   and download `RapidClicker.dmg`.
-2. Open the `.dmg` and drag **RapidClicker** into your **Applications** folder.
-3. **First launch:** because the app isn't notarized by Apple, macOS will warn
+**[⬇️ Download the latest RapidClicker.dmg](https://github.com/emilwjensen/rapidclicker/releases/latest/download/RapidClicker.dmg)** — then:
+
+1. Open the `.dmg` and drag **RapidClicker** into your **Applications** folder.
+2. **First launch:** because the app isn't notarized by Apple, macOS will warn
    that it "cannot be opened." Just **right-click the app → Open → Open** (you
    only need to do this once). Alternatively: **System Settings → Privacy &
    Security → Open Anyway**.
-4. **Grant Accessibility permission** when prompted — RapidClicker needs it to
+3. **Grant Accessibility permission** when prompted — RapidClicker needs it to
    send clicks to other apps. If it doesn't prompt, open **System Settings →
    Privacy & Security → Accessibility** and enable **RapidClicker**, then quit
    and reopen the app.
+
+📖 **Full step-by-step walkthrough (with troubleshooting): [INSTALL.md](INSTALL.md).**
 
 > ⚠️ **Why the warning?** Distributing a Mac app with no Gatekeeper friction
 > requires an Apple Developer ID and notarization (a paid Apple Developer
