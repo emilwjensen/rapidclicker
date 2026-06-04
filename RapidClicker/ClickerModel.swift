@@ -76,7 +76,7 @@ final class ClickerModel {
     static let rateRange: ClosedRange<Double> = 1...200
 
     /// Allowed range for the auto-stop click count.
-    static let autoStopRange: ClosedRange<Int> = 1...1_000_000
+    static let autoStopRange: ClosedRange<Int> = 1...1000
 
     /// Allowed interval range (seconds), derived from `rateRange`.
     static let intervalRange: ClosedRange<TimeInterval> =
@@ -108,7 +108,7 @@ final class ClickerModel {
             defaults.set("A", forKey: Keys.key)
         }
 
-        let savedInterval = defaults.object(forKey: Keys.interval) as? TimeInterval ?? 0.1
+        let savedInterval = defaults.object(forKey: Keys.interval) as? TimeInterval ?? 0.01
         interval = min(max(savedInterval, Self.intervalRange.lowerBound), Self.intervalRange.upperBound)
         modifierMask = UInt32(defaults.integer(forKey: Keys.modifiers))
         keyLetter = defaults.string(forKey: Keys.key) ?? "A"
