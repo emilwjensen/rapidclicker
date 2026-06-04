@@ -121,7 +121,7 @@ struct ContentView: View {
                            ? .easeInOut(duration: 0.6).repeatForever(autoreverses: true)
                            : .default,
                            value: pulse)
-            Text(model.isRunning ? "Clicking — \(model.clicksSent) sent" : "Idle")
+            Text(statusText)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .contentTransition(.numericText())
@@ -130,6 +130,13 @@ struct ContentView: View {
         .onChange(of: model.isRunning) { _, running in
             pulse = running
         }
+    }
+
+    /// Status text: live count while running, the last run's total once stopped.
+    private var statusText: String {
+        if model.isRunning { return "Clicking — \(model.clicksSent) sent" }
+        if model.clicksSent > 0 { return "Stopped — \(model.clicksSent) sent" }
+        return "Idle"
     }
 
     private var header: some View {
