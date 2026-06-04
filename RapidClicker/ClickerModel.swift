@@ -55,7 +55,7 @@ final class ClickerModel {
     // MARK: - Constants
 
     /// User-facing click-rate range, in clicks per second.
-    static let rateRange: ClosedRange<Double> = 1...100
+    static let rateRange: ClosedRange<Double> = 1...200
 
     /// Allowed interval range (seconds), derived from `rateRange`.
     static let intervalRange: ClosedRange<TimeInterval> =

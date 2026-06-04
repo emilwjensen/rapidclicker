@@ -108,6 +108,12 @@ struct ContentView: View {
         }
         .padding(22)
         .frame(width: 360)
+        .background(
+            // Tapping anywhere outside the controls drops the rate field's focus.
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { rateFieldFocused = false }
+        )
         .onAppear {
             // Don't let the rate field grab focus (and a highlight) on launch.
             DispatchQueue.main.async { NSApp.keyWindow?.makeFirstResponder(nil) }
