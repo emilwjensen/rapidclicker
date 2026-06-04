@@ -18,6 +18,13 @@ struct ContentView: View {
     var body: some View {
         @Bindable var model = model
 
+        // Whole-number clicks-per-second, for the text field and stepper.
+        let rate = Binding<Int>(
+            get: { model.roundedRate },
+            set: { model.clicksPerSecond = Double($0) }
+        )
+        let rateBounds = Int(ClickerModel.rateRange.lowerBound)...Int(ClickerModel.rateRange.upperBound)
+
         VStack(spacing: 18) {
             header
 
@@ -26,19 +33,24 @@ struct ContentView: View {
             }
 
             GroupBox {
-                VStack(alignment: .leading, spacing: 8) {
-                    Slider(value: $model.interval, in: ClickerModel.intervalRange)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Text("Clicks per second")
+                        Spacer()
+                        TextField("CPS", value: rate, format: .number)
+                            .textFieldStyle(.roundedBorder)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 64)
+                        Stepper("", value: rate, in: rateBounds).labelsHidden()
+                    }
+                    Slider(value: $model.clicksPerSecond, in: ClickerModel.rateRange)
                     HStack {
                         Text("Interval")
                         Spacer()
                         Text(model.intervalDescription).monospacedDigit().foregroundStyle(.secondary)
                     }
-                    HStack {
-                        Text("Rate")
-                        Spacer()
-                        Text("\(model.clicksPerSecond) clicks/sec").foregroundStyle(.secondary)
-                    }
                     .font(.callout)
+                    .foregroundStyle(.secondary)
                 }
                 .padding(4)
             } label: {

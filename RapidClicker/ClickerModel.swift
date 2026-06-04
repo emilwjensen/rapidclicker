@@ -51,7 +51,12 @@ final class ClickerModel {
 
     // MARK: - Constants
 
-    static let intervalRange: ClosedRange<TimeInterval> = 0.001...0.1
+    /// User-facing click-rate range, in clicks per second.
+    static let rateRange: ClosedRange<Double> = 1...1000
+
+    /// Allowed interval range (seconds), derived from `rateRange`.
+    static let intervalRange: ClosedRange<TimeInterval> =
+        (1.0 / rateRange.upperBound)...(1.0 / rateRange.lowerBound)
 
     // MARK: - Collaborators
 
@@ -108,9 +113,19 @@ final class ClickerModel {
 
     // MARK: - Derived display values
 
-    var intervalDescription: String { String(format: "%.3f s", interval) }
+    /// Click rate in clicks per second. Backed by `interval` (= 1 / rate).
+    var clicksPerSecond: Double {
+        get { interval > 0 ? 1.0 / interval : Self.rateRange.upperBound }
+        set {
+            let clamped = min(max(newValue, Self.rateRange.lowerBound), Self.rateRange.upperBound)
+            interval = 1.0 / clamped
+        }
+    }
 
-    var clicksPerSecond: Int { interval > 0 ? Int((1.0 / interval).rounded()) : 0 }
+    /// Click rate rounded to a whole number, for display and text entry.
+    var roundedRate: Int { Int(clicksPerSecond.rounded()) }
+
+    var intervalDescription: String { String(format: "%.3f s", interval) }
 
     var hotKeyDescription: String {
         let modifiers = ModifierCombo.combo(forMask: modifierMask)?.title ?? "?"

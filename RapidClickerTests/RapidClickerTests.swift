@@ -60,4 +60,21 @@ struct RapidClickerTests {
         model.interval = 0.0
         #expect(model.interval == ClickerModel.intervalRange.lowerBound)
     }
+
+    @MainActor
+    @Test func clicksPerSecondMapsToIntervalAndClamps() {
+        let model = ClickerModel()
+
+        model.clicksPerSecond = 50
+        #expect(abs(model.interval - 0.02) < 1e-9)
+        #expect(model.roundedRate == 50)
+
+        // Above the maximum rate clamps to the fastest allowed.
+        model.clicksPerSecond = 100_000
+        #expect(model.roundedRate == Int(ClickerModel.rateRange.upperBound))
+
+        // Below the minimum clamps to the slowest allowed.
+        model.clicksPerSecond = 0
+        #expect(model.roundedRate == Int(ClickerModel.rateRange.lowerBound))
+    }
 }

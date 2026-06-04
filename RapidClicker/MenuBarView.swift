@@ -36,8 +36,8 @@ struct MenuBarView: View {
             .tint(model.isRunning ? .red : .green)
 
             VStack(spacing: 4) {
+                row("Rate", "\(model.roundedRate)/sec")
                 row("Interval", model.intervalDescription)
-                row("Rate", "\(model.clicksPerSecond)/sec")
                 row("Hotkey", model.hotKeyDescription)
             }
             .font(.callout)
