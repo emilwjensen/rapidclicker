@@ -133,13 +133,10 @@ struct ContentView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
+        HStack {
             Text("RapidClicker")
                 .font(.title2.bold())
             Spacer()
-            Circle()
-                .fill(model.isRunning ? .green : .secondary.opacity(0.4))
-                .frame(width: 10, height: 10)
         }
     }
 
