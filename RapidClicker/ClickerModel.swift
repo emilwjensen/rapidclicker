@@ -49,6 +49,24 @@ final class ClickerModel {
         didSet { persistAndRegisterHotKey() }
     }
 
+    /// Whether clicking should stop automatically after `autoStopCount` clicks.
+    var autoStopEnabled: Bool {
+        didSet { defaults.set(autoStopEnabled, forKey: Keys.autoStopEnabled) }
+    }
+
+    /// Number of clicks after which clicking stops (when `autoStopEnabled`).
+    var autoStopCount: Int {
+        didSet {
+            // Guard the clamp re-assignment against @Observable setter recursion.
+            let clamped = min(max(autoStopCount, Self.autoStopRange.lowerBound), Self.autoStopRange.upperBound)
+            if autoStopCount != clamped {
+                autoStopCount = clamped
+                return
+            }
+            defaults.set(autoStopCount, forKey: Keys.autoStopCount)
+        }
+    }
+
     /// Whether the app has been granted Accessibility permission.
     private(set) var accessibilityTrusted = AXIsProcessTrusted()
 
@@ -56,6 +74,9 @@ final class ClickerModel {
 
     /// User-facing click-rate range, in clicks per second.
     static let rateRange: ClosedRange<Double> = 1...200
+
+    /// Allowed range for the auto-stop click count.
+    static let autoStopRange: ClosedRange<Int> = 1...1_000_000
 
     /// Allowed interval range (seconds), derived from `rateRange`.
     static let intervalRange: ClosedRange<TimeInterval> =
@@ -72,6 +93,8 @@ final class ClickerModel {
         static let modifiers = "savedModifiers"
         static let key = "savedKey"
         static let interval = "savedInterval"
+        static let autoStopEnabled = "autoStopEnabled"
+        static let autoStopCount = "autoStopCount"
     }
 
     // MARK: - Init
@@ -90,8 +113,14 @@ final class ClickerModel {
         modifierMask = UInt32(defaults.integer(forKey: Keys.modifiers))
         keyLetter = defaults.string(forKey: Keys.key) ?? "A"
 
+        // Auto-stop defaults to on, after 1000 clicks.
+        autoStopEnabled = defaults.object(forKey: Keys.autoStopEnabled) as? Bool ?? true
+        let savedStop = defaults.object(forKey: Keys.autoStopCount) as? Int ?? 1000
+        autoStopCount = min(max(savedStop, Self.autoStopRange.lowerBound), Self.autoStopRange.upperBound)
+
         hotKey.onTrigger = { [weak self] in self?.toggle() }
         registerHotKey()
+        clicker.onLimitReached = { [weak self] in self?.handleAutoStop() }
 
         // Re-check Accessibility status whenever the app comes forward, so the
         // UI updates after the user grants permission in System Settings.
@@ -113,9 +142,16 @@ final class ClickerModel {
         } else {
             clicker.resetCount()
             clicksSent = 0
+            clicker.clickLimit = autoStopEnabled ? autoStopCount : nil
             clicker.start(interval: interval)
             startDisplayUpdates()
         }
+        isRunning = clicker.isRunning
+    }
+
+    /// Called on the main thread when the engine hits the auto-stop limit.
+    private func handleAutoStop() {
+        stopDisplayUpdates()
         isRunning = clicker.isRunning
     }
 

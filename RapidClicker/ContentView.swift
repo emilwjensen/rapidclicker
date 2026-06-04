@@ -12,7 +12,9 @@ import AppKit
 struct ContentView: View {
     @Environment(ClickerModel.self) private var model
     @State private var pulse = false
-    @FocusState private var rateFieldFocused: Bool
+
+    private enum Field { case rate, limit }
+    @FocusState private var focusedField: Field?
 
     /// While permission is missing, re-check periodically so the banner clears
     /// as soon as the user enables it in System Settings.
@@ -27,6 +29,12 @@ struct ContentView: View {
             set: { model.clicksPerSecond = Double($0) }
         )
         let rateBounds = Int(ClickerModel.rateRange.lowerBound)...Int(ClickerModel.rateRange.upperBound)
+
+        // Whole-number auto-stop count for its text field.
+        let stopCount = Binding<Int>(
+            get: { model.autoStopCount },
+            set: { model.autoStopCount = $0 }
+        )
 
         VStack(spacing: 18) {
             header
@@ -44,8 +52,8 @@ struct ContentView: View {
                             .textFieldStyle(.roundedBorder)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 64)
-                            .focused($rateFieldFocused)
-                            .onSubmit { rateFieldFocused = false }
+                            .focused($focusedField, equals: .rate)
+                            .onSubmit { focusedField = nil }
                         Stepper("", value: rate, in: rateBounds).labelsHidden()
                     }
                     Slider(value: $model.clicksPerSecond, in: ClickerModel.rateRange)
@@ -60,6 +68,26 @@ struct ContentView: View {
                 .padding(4)
             } label: {
                 Label("Click Speed", systemImage: "speedometer")
+            }
+
+            GroupBox {
+                HStack(spacing: 8) {
+                    Toggle("Stop after", isOn: $model.autoStopEnabled)
+                        .toggleStyle(.checkbox)
+                    TextField("", value: stopCount, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 72)
+                        .focused($focusedField, equals: .limit)
+                        .onSubmit { focusedField = nil }
+                        .disabled(!model.autoStopEnabled)
+                    Text("clicks")
+                        .foregroundStyle(model.autoStopEnabled ? .primary : .secondary)
+                    Spacer()
+                }
+                .padding(4)
+            } label: {
+                Label("Auto-stop", systemImage: "stop.circle")
             }
 
             GroupBox {
@@ -112,7 +140,7 @@ struct ContentView: View {
             // Tapping anywhere outside the controls drops the rate field's focus.
             Color.clear
                 .contentShape(Rectangle())
-                .onTapGesture { rateFieldFocused = false }
+                .onTapGesture { focusedField = nil }
         )
         .onAppear {
             // Don't let the rate field grab focus (and a highlight) on launch.

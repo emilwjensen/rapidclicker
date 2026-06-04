@@ -77,4 +77,18 @@ struct RapidClickerTests {
         model.clicksPerSecond = 0
         #expect(model.roundedRate == Int(ClickerModel.rateRange.lowerBound))
     }
+
+    @MainActor
+    @Test func autoStopCountClampsToRange() {
+        let model = ClickerModel()
+
+        model.autoStopCount = 1000
+        #expect(model.autoStopCount == 1000)
+
+        model.autoStopCount = 0
+        #expect(model.autoStopCount == ClickerModel.autoStopRange.lowerBound)
+
+        model.autoStopCount = 9_999_999
+        #expect(model.autoStopCount == ClickerModel.autoStopRange.upperBound)
+    }
 }

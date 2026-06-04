@@ -26,12 +26,25 @@ final class AutoClicker {
     /// Whether the clicker is currently firing. Mutated only from the main thread.
     private(set) var isRunning = false
 
+    /// Stop automatically once `count` reaches this many clicks (nil = unlimited).
+    var clickLimit: Int?
+
+    /// Invoked on the main thread when `clickLimit` is reached.
+    var onLimitReached: (() -> Void)?
+
     /// Starts clicking every `interval` seconds. Restarts if already running.
     func start(interval: TimeInterval) {
         stop()
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now(), repeating: interval, leeway: .nanoseconds(0))
-        timer.setEventHandler { [weak self] in self?.click() }
+        timer.setEventHandler { [weak self, weak timer] in
+            guard let self else { return }
+            self.click()
+            if let limit = self.clickLimit, self.count >= limit {
+                timer?.cancel()
+                DispatchQueue.main.async { self.handleLimitReached() }
+            }
+        }
         timer.resume()
         self.timer = timer
         isRunning = true
@@ -49,6 +62,11 @@ final class AutoClicker {
 
     /// Resets the click counter to zero.
     func resetCount() { queue.sync { count = 0 } }
+
+    private func handleLimitReached() {
+        stop()
+        onLimitReached?()
+    }
 
     /// Posts a single left-button down/up at the pointer's current position.
     private func click() {
