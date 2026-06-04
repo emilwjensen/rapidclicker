@@ -13,14 +13,20 @@ your cursor is — until you toggle it off with the same hotkey.
 - **Adjustable click rate** — from 0.001 s to 0.1 s between clicks (≈10–1000 clicks/sec).
 - **Global hotkey toggle** — start/stop without switching to the app. Pick a
   modifier combo (`⌘+⇧`, `⌥+⇧`, or `⌘+⌥+⇧`) plus a letter `A`–`Z`.
-- **Remembers your settings** — the chosen hotkey is persisted between launches
-  (default: `⌘+⇧+A`).
+- **Menu-bar item** — quick start/stop and a glance at your settings from the
+  menu bar, in addition to the main window.
+- **Live Accessibility status** — the UI shows whether permission is granted and
+  offers a one-click way to open the right settings pane.
+- **Remembers your settings** — hotkey and interval persist between launches
+  (default hotkey: `⌘+⇧+A`).
 - **Clicks at the cursor** — each click is posted at the pointer's current location.
 
 ## Requirements
 
-- macOS 11.5 or later
+- macOS 14 (Sonoma) or later
 - Xcode 16 or later (to build from source)
+
+Built with **SwiftUI** (window + `MenuBarExtra`) and the Observation framework.
 
 ## Building & running
 
@@ -47,39 +53,44 @@ grant it. If clicks don't seem to register:
 
 ## Usage
 
-1. Launch RapidClicker and grant Accessibility permission when prompted.
-2. (Optional) Choose a **modifier + key**, then click **Set Shortcut** to change
-   the global hotkey.
+1. Launch RapidClicker and grant Accessibility permission when prompted (a banner
+   in the window also offers a **Grant…** button).
+2. Choose a **modifier + key** from the two menus — the global hotkey updates
+   immediately.
 3. Drag the slider to set your click **interval**.
 4. Click **Start** (or press your hotkey) to begin; **Stop** (or the hotkey
-   again) to end. The hotkey works even when the window isn't focused.
+   again) to end. The hotkey and the menu-bar item work even when the window
+   isn't focused — close the window and the app keeps living in the menu bar.
 
 ## Project structure
 
 ```
 RapidClicker/
-├── AppDelegate.swift      App lifecycle, global hotkey, Accessibility prompt
-├── ViewController.swift   The settings window (hotkey, interval, start/stop)
-├── AutoClicker.swift      Timer that posts the synthetic mouse clicks
-├── KeyCodes.swift         Letter↔key-code map, modifier combos, FourCharCode
-├── ClickSettings.swift    Shared interval setting + notification names
-├── Base.lproj/            Main.storyboard (UI layout)
-├── Assets.xcassets/       App icon & accent color
-├── Info.plist             Bundle configuration
+├── RapidClickerApp.swift   @main entry point; Window + MenuBarExtra scenes
+├── ContentView.swift       Main window UI (speed, hotkey, start/stop)
+├── MenuBarView.swift        Menu-bar popover UI
+├── ClickerModel.swift       @Observable state: settings, engine, permissions
+├── AutoClicker.swift        Timer that posts the synthetic mouse clicks
+├── HotKeyManager.swift      Carbon global-hotkey registration
+├── KeyCodes.swift           Letter↔key-code map, modifier combos, FourCharCode
+├── Assets.xcassets/         App icon & accent color
+├── Info.plist               Bundle configuration
 └── RapidClicker.entitlements
-RapidClickerTests/         Unit tests (Swift Testing)
-RapidClickerUITests/       UI test stubs (XCTest)
+RapidClickerTests/           Unit tests (Swift Testing)
+RapidClickerUITests/         UI test stubs (XCTest)
 ```
 
 ### How it works
 
-- **Hotkey** — registered through the Carbon `RegisterEventHotKey` API and tagged
-  with a four-char signature (`"Rcik"`). A single Carbon event handler watches for
-  it and calls `AppDelegate.toggleClick()`.
+- **State** — `ClickerModel` is an `@Observable` single source of truth. SwiftUI
+  views bind to it directly; it owns the engine, the hotkey, and persistence.
+- **Hotkey** — `HotKeyManager` wraps the Carbon `RegisterEventHotKey` API, tagging
+  the hotkey with a four-char signature (`"Rcik"`). Its event handler calls back
+  into the model to toggle clicking.
 - **Clicking** — `AutoClicker` schedules a repeating `Timer`; each tick posts a
   `.leftMouseDown` + `.leftMouseUp` pair via `CGEvent` at the cursor's location.
-- **State** — `ClickSettings.shared` holds the interval and broadcasts changes
-  over `NotificationCenter`, which keeps the UI and engine in sync.
+- **Permissions** — the model checks `AXIsProcessTrusted()` and refreshes when the
+  app becomes active, so the UI reflects Accessibility status live.
 
 ## Tests
 
