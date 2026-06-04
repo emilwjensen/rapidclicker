@@ -7,10 +7,12 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct ContentView: View {
     @Environment(ClickerModel.self) private var model
     @State private var pulse = false
+    @FocusState private var rateFieldFocused: Bool
 
     /// While permission is missing, re-check periodically so the banner clears
     /// as soon as the user enables it in System Settings.
@@ -42,6 +44,8 @@ struct ContentView: View {
                             .textFieldStyle(.roundedBorder)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 64)
+                            .focused($rateFieldFocused)
+                            .onSubmit { rateFieldFocused = false }
                         Stepper("", value: rate, in: rateBounds).labelsHidden()
                     }
                     Slider(value: $model.clicksPerSecond, in: ClickerModel.rateRange)
@@ -91,7 +95,6 @@ struct ContentView: View {
             .controlSize(.large)
             .buttonStyle(.borderedProminent)
             .tint(model.isRunning ? .red : .green)
-            .keyboardShortcut(.defaultAction)
             .disabled(!model.accessibilityTrusted)
             .help(model.accessibilityTrusted
                   ? "Start or stop clicking (or use your hotkey)."
@@ -105,6 +108,10 @@ struct ContentView: View {
         }
         .padding(22)
         .frame(width: 360)
+        .onAppear {
+            // Don't let the rate field grab focus (and a highlight) on launch.
+            DispatchQueue.main.async { NSApp.keyWindow?.makeFirstResponder(nil) }
+        }
         .onReceive(permissionTimer) { _ in
             if !model.accessibilityTrusted { model.refreshAccessibility() }
         }
