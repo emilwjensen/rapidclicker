@@ -11,6 +11,10 @@ import SwiftUI
 struct ContentView: View {
     @Environment(ClickerModel.self) private var model
 
+    /// While permission is missing, re-check periodically so the banner clears
+    /// as soon as the user enables it in System Settings.
+    private let permissionTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+
     var body: some View {
         @Bindable var model = model
 
@@ -81,7 +85,10 @@ struct ContentView: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(22)
-        .frame(width: 340)
+        .frame(width: 360)
+        .onReceive(permissionTimer) { _ in
+            if !model.accessibilityTrusted { model.refreshAccessibility() }
+        }
     }
 
     private var header: some View {
@@ -100,18 +107,29 @@ struct ContentView: View {
 
     private var accessibilityBanner: some View {
         GroupBox {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Accessibility permission required").bold()
-                    Text("RapidClicker needs permission to send clicks to other apps.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                Label {
+                    Text("Accessibility permission required")
+                        .fontWeight(.semibold)
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
                 }
-                Spacer()
-                Button("Grant…") { model.requestAccessibility() }
+
+                Text("RapidClicker can't click in other apps until you enable it under Privacy & Security → Accessibility. Turn it on there, then come back — this banner clears automatically.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button {
+                    model.requestAccessibility()
+                } label: {
+                    Text("Open Accessibility Settings…")
+                        .frame(maxWidth: .infinity)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(4)
         }
     }

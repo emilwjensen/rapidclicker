@@ -45,4 +45,19 @@ struct RapidClickerTests {
             #expect(ModifierCombo.combo(forMask: combo.mask)?.title == combo.title)
         }
     }
+
+    @MainActor
+    @Test func settingIntervalClampsWithoutRecursing() {
+        let model = ClickerModel()
+
+        model.interval = 0.05
+        #expect(model.interval == 0.05)
+
+        // Out-of-range values must be clamped (and must not infinitely recurse).
+        model.interval = 1.0
+        #expect(model.interval == ClickerModel.intervalRange.upperBound)
+
+        model.interval = 0.0
+        #expect(model.interval == ClickerModel.intervalRange.lowerBound)
+    }
 }

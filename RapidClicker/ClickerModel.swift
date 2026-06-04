@@ -20,10 +20,17 @@ final class ClickerModel {
     /// Whether the auto-clicker is currently firing.
     private(set) var isRunning = false
 
-    /// Seconds between synthesized clicks (clamped to `intervalRange`).
+    /// Seconds between synthesized clicks (kept within `intervalRange`).
     var interval: TimeInterval {
         didSet {
-            interval = min(max(interval, Self.intervalRange.lowerBound), Self.intervalRange.upperBound)
+            // Clamp out-of-range values. Re-assigning here re-enters `didSet`
+            // once (because @Observable makes this a computed setter), so guard
+            // it to avoid infinite recursion.
+            let clamped = min(max(interval, Self.intervalRange.lowerBound), Self.intervalRange.upperBound)
+            if interval != clamped {
+                interval = clamped
+                return
+            }
             defaults.set(interval, forKey: Keys.interval)
             if isRunning { clicker.start(interval: interval) }
         }
