@@ -1,101 +1,107 @@
 # RapidClicker
 
-A lightweight native **macOS auto-clicker**. Set a click speed, pick a global
-hotkey, and RapidClicker will repeatedly click the left mouse button wherever
-your cursor is — until you toggle it off with the same hotkey.
+A lightweight native **macOS auto-clicker**. Set a click rate, pick a global
+hotkey, and RapidClicker repeatedly clicks the left mouse button at your cursor —
+until you stop it, or until it hits your auto-stop limit.
 
 <p align="center">
   <img src="RapidClicker/Assets.xcassets/AppIcon.appiconset/256-mac.png" width="128" alt="RapidClicker icon">
 </p>
 
-## Features
+## Download & install
 
-- **Adjustable click rate** — from 0.001 s to 0.1 s between clicks (≈10–1000 clicks/sec).
-- **Global hotkey toggle** — start/stop without switching to the app. Pick a
-  modifier combo (`⌘+⇧`, `⌥+⇧`, or `⌘+⌥+⇧`) plus a letter `A`–`Z`.
-- **Menu-bar item** — quick start/stop and a glance at your settings from the
-  menu bar, in addition to the main window.
-- **Live Accessibility status** — the UI shows whether permission is granted and
-  offers a one-click way to open the right settings pane.
-- **Remembers your settings** — hotkey and interval persist between launches
-  (default hotkey: `⌘+⇧+A`).
-- **Clicks at the cursor** — each click is posted at the pointer's current location.
+1. Go to the [**latest release**](https://github.com/emilwjensen/rapidclicker/releases/latest)
+   and download `RapidClicker.dmg`.
+2. Open the `.dmg` and drag **RapidClicker** into your **Applications** folder.
+3. **First launch:** because the app isn't notarized by Apple, macOS will warn
+   that it "cannot be opened." Just **right-click the app → Open → Open** (you
+   only need to do this once). Alternatively: **System Settings → Privacy &
+   Security → Open Anyway**.
+4. **Grant Accessibility permission** when prompted — RapidClicker needs it to
+   send clicks to other apps. If it doesn't prompt, open **System Settings →
+   Privacy & Security → Accessibility** and enable **RapidClicker**, then quit
+   and reopen the app.
+
+> ⚠️ **Why the warning?** Distributing a Mac app with no Gatekeeper friction
+> requires an Apple Developer ID and notarization (a paid Apple Developer
+> Program). RapidClicker is signed but not notarized, so the one-time
+> right-click-Open step above is expected and safe.
 
 ## Requirements
 
-- macOS 14 (Sonoma) or later
-- Xcode 16 or later (to build from source)
+- **macOS 14 (Sonoma)** or later
+- Apple Silicon or Intel Mac
+- Xcode 16 or later (only to build from source)
 
-Built with **SwiftUI** (window + `MenuBarExtra`) and the Observation framework.
+## Features
 
-## Building & running
+- **Set the speed in clicks per second** — drag the slider (1–200 CPS) or type an
+  exact value. The interval in seconds is shown as a secondary readout.
+- **Auto-stop** — stop automatically after a set number of clicks (on by default,
+  1000, max 1000), or turn it off to run until you stop it.
+- **Global hotkey toggle** — start/stop from anywhere without switching apps.
+  Pick a modifier combo (`⌘+⇧`, `⌥+⇧`, or `⌘+⌥+⇧`) plus a letter `A`–`Z`.
+- **Window + menu bar** — a main window and a menu-bar item, sharing one state.
+  Close the window and the app keeps living in the menu bar.
+- **Live feedback** — a pulsing indicator and a running "clicks sent" count while
+  active; the last run's total stays visible after you stop.
+- **Accessibility-aware** — shows whether permission is granted, with a one-click
+  way to open the right settings pane; **Start** is disabled until it's granted.
+- **Remembers your settings** — speed, hotkey, and auto-stop persist between
+  launches (default hotkey: `⌘+⇧+A`).
+
+## Usage
+
+1. Launch RapidClicker and grant Accessibility permission when prompted.
+2. Set the **clicks per second** (slider, text field, or stepper).
+3. (Optional) Adjust **Auto-stop**, or uncheck it to click indefinitely.
+4. (Optional) Pick a **modifier + key** for the global hotkey — it applies
+   immediately.
+5. Click **Start** (or press your hotkey) to begin; **Stop** (or the hotkey
+   again) to end.
+
+## Building from source
 
 1. Open `RapidClicker.xcodeproj` in Xcode.
 2. Select the **RapidClicker** scheme and press **⌘R**.
 
-> **Note on code signing:** the project is set to *Automatic* signing with a
-> development team. To build under your own account, change the Team in
-> *Signing & Capabilities* (or set it to "None" for a local-only build).
+> **Code signing:** the project uses Automatic signing. To build under your own
+> account, set your Team in *Signing & Capabilities*. The app runs **without the
+> App Sandbox** (it posts system-wide events), so it is not eligible for the Mac
+> App Store — see [`RapidClicker.entitlements`](RapidClicker/RapidClicker.entitlements).
 
-### Accessibility permission (required)
-
-RapidClicker synthesizes mouse events into other apps, which macOS gates behind
-the **Accessibility** privacy permission. On first launch the app prompts you to
-grant it. If clicks don't seem to register:
-
-1. Open **System Settings → Privacy & Security → Accessibility**.
-2. Enable **RapidClicker** (add it with **+** if it isn't listed).
-3. Relaunch the app.
-
-> Because it posts system-wide events, the app runs **without the App Sandbox**
-> and is therefore not distributable via the Mac App Store. See
-> [`RapidClicker.entitlements`](RapidClicker/RapidClicker.entitlements).
-
-## Usage
-
-1. Launch RapidClicker and grant Accessibility permission when prompted (a banner
-   in the window also offers a **Grant…** button).
-2. Choose a **modifier + key** from the two menus — the global hotkey updates
-   immediately.
-3. Drag the slider to set your click **interval**.
-4. Click **Start** (or press your hotkey) to begin; **Stop** (or the hotkey
-   again) to end. The hotkey and the menu-bar item work even when the window
-   isn't focused — close the window and the app keeps living in the menu bar.
+Run the unit tests with **⌘U** (or `xcodebuild test`). They cover the key-code
+map, modifier combos, the `FourCharCode` helper, and the speed/auto-stop clamping.
 
 ## Project structure
 
 ```
 RapidClicker/
 ├── RapidClickerApp.swift   @main entry point; Window + MenuBarExtra scenes
-├── ContentView.swift       Main window UI (speed, hotkey, start/stop)
-├── MenuBarView.swift        Menu-bar popover UI
-├── ClickerModel.swift       @Observable state: settings, engine, permissions
-├── AutoClicker.swift        Timer that posts the synthetic mouse clicks
-├── HotKeyManager.swift      Carbon global-hotkey registration
-├── KeyCodes.swift           Letter↔key-code map, modifier combos, FourCharCode
-├── Assets.xcassets/         App icon & accent color
-├── Info.plist               Bundle configuration
+├── ContentView.swift       Main window UI (speed, auto-stop, hotkey, start/stop)
+├── MenuBarView.swift       Menu-bar popover UI
+├── ClickerModel.swift      @Observable state: settings, engine, permissions
+├── AutoClicker.swift       Dispatch-timer click engine (with click limit)
+├── HotKeyManager.swift     Carbon global-hotkey registration
+├── KeyCodes.swift          Letter↔key-code map, modifier combos, FourCharCode
+├── Assets.xcassets/        App icon & accent color
+├── Info.plist              Bundle configuration
 └── RapidClicker.entitlements
-RapidClickerTests/           Unit tests (Swift Testing)
-RapidClickerUITests/         UI test stubs (XCTest)
+RapidClickerTests/          Unit tests (Swift Testing)
+RapidClickerUITests/        UI test stubs (XCTest)
 ```
 
 ### How it works
 
 - **State** — `ClickerModel` is an `@Observable` single source of truth. SwiftUI
   views bind to it directly; it owns the engine, the hotkey, and persistence.
-- **Hotkey** — `HotKeyManager` wraps the Carbon `RegisterEventHotKey` API, tagging
-  the hotkey with a four-char signature (`"Rcik"`). Its event handler calls back
-  into the model to toggle clicking.
-- **Clicking** — `AutoClicker` schedules a repeating `Timer`; each tick posts a
-  `.leftMouseDown` + `.leftMouseUp` pair via `CGEvent` at the cursor's location.
-- **Permissions** — the model checks `AXIsProcessTrusted()` and refreshes when the
-  app becomes active, so the UI reflects Accessibility status live.
-
-## Tests
-
-Run the unit tests from Xcode with **⌘U**. They cover the key-code map, the
-modifier combinations, and the `FourCharCode` packing helper.
+- **Clicking** — `AutoClicker` runs a high-priority `DispatchSourceTimer`; each
+  tick posts a `.leftMouseDown` + `.leftMouseUp` pair via `CGEvent` at the
+  cursor's location, and stops precisely when the auto-stop limit is reached.
+- **Hotkey** — `HotKeyManager` wraps the Carbon `RegisterEventHotKey` API, tagged
+  with a four-char signature (`"Rcik"`), and calls back to toggle clicking.
+- **Permissions** — the model checks `AXIsProcessTrusted()` and re-checks while
+  the app is active, so the UI reflects Accessibility status live.
 
 ## License
 

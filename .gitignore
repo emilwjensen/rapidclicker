@@ -22,3 +22,7 @@ DerivedData/
 # Swift Package Manager
 .build/
 .swiftpm/
+
+# Distribution artifacts (uploaded to GitHub Releases, not committed)
+*.dmg
+*.zip
