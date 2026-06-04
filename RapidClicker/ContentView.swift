@@ -93,9 +93,6 @@ struct ContentView: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: "cursorarrow.click.2")
-                .font(.title)
-                .foregroundStyle(.tint)
             Text("RapidClicker")
                 .font(.title2.bold())
             Spacer()
