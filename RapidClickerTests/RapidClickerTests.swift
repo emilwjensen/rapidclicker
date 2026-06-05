@@ -11,6 +11,13 @@ import Carbon
 
 struct RapidClickerTests {
 
+    /// A model backed by an isolated UserDefaults suite, so tests never read or
+    /// write the app's real settings.
+    @MainActor private func makeModel() -> ClickerModel {
+        let suite = UserDefaults(suiteName: "RapidClickerTests.\(UUID().uuidString)")!
+        return ClickerModel(defaults: suite)
+    }
+
     @Test func letterListCoversAToZ() {
         #expect(KeyCodes.letters.count == 26)
         #expect(KeyCodes.letters.first == "A")
@@ -56,7 +63,7 @@ struct RapidClickerTests {
 
     @MainActor
     @Test func settingIntervalClampsWithoutRecursing() {
-        let model = ClickerModel()
+        let model = makeModel()
 
         model.interval = 0.05
         #expect(model.interval == 0.05)
@@ -71,7 +78,7 @@ struct RapidClickerTests {
 
     @MainActor
     @Test func clicksPerSecondMapsToIntervalAndClamps() {
-        let model = ClickerModel()
+        let model = makeModel()
 
         model.clicksPerSecond = 50
         #expect(abs(model.interval - 0.02) < 1e-9)
@@ -88,7 +95,7 @@ struct RapidClickerTests {
 
     @MainActor
     @Test func autoStopValueClampsAndComputesDuration() {
-        let model = ClickerModel()
+        let model = makeModel()
 
         model.autoStopUnit = .seconds
         model.autoStopValue = 30

@@ -100,7 +100,7 @@ final class ClickerModel {
 
     @ObservationIgnored private let clicker = AutoClicker()
     @ObservationIgnored private let hotKey = HotKeyManager()
-    @ObservationIgnored private let defaults = UserDefaults.standard
+    @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var displayTimer: Timer?
     @ObservationIgnored private var autoStopTimer: Timer?
     @ObservationIgnored private var runEndDate: Date?
@@ -117,8 +117,10 @@ final class ClickerModel {
 
     // MARK: - Init
 
-    init() {
-        let defaults = UserDefaults.standard
+    /// `defaults` is injectable so tests can use an isolated store and never
+    /// touch the user's real settings.
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
 
         let savedInterval = defaults.object(forKey: Keys.interval) as? TimeInterval ?? 0.01
         interval = min(max(savedInterval, Self.intervalRange.lowerBound), Self.intervalRange.upperBound)
@@ -134,11 +136,11 @@ final class ClickerModel {
             shortcut = .default
         }
 
-        // Auto-stop defaults to on, after 30 seconds.
+        // Auto-stop defaults to on, after 5 minutes.
         autoStopEnabled = defaults.object(forKey: Keys.autoStopEnabled) as? Bool ?? true
-        let savedValue = defaults.object(forKey: Keys.autoStopValue) as? Int ?? 30
+        let savedValue = defaults.object(forKey: Keys.autoStopValue) as? Int ?? 5
         autoStopValue = min(max(savedValue, Self.autoStopValueRange.lowerBound), Self.autoStopValueRange.upperBound)
-        autoStopUnit = AutoStopUnit(rawValue: defaults.string(forKey: Keys.autoStopUnit) ?? "") ?? .seconds
+        autoStopUnit = AutoStopUnit(rawValue: defaults.string(forKey: Keys.autoStopUnit) ?? "") ?? .minutes
 
         hotKey.onTrigger = { [weak self] in self?.toggle() }
         _ = hotKey.register(modifiers: shortcut.modifiers, keyCode: shortcut.keyCode)
