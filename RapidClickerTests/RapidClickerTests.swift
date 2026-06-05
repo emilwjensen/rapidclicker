@@ -33,17 +33,25 @@ struct RapidClickerTests {
         #expect("Rcik".fourCharCodeValue == 0x5263_696B)
     }
 
-    @Test func everyModifierComboIncludesShift() {
-        #expect(!ModifierCombo.all.isEmpty)
-        for combo in ModifierCombo.all {
-            #expect(combo.mask & UInt32(shiftKey) != 0)
-        }
+    @Test func shortcutDescribesModifiersAndKey() {
+        // Modifiers render in macOS's native order: ⌃⌥⇧⌘ (Command rightmost).
+        let s = Shortcut(keyCode: UInt32(kVK_ANSI_F),
+                         modifiers: UInt32(cmdKey) | UInt32(shiftKey))
+        #expect(s.description == "⇧⌘F")
+
+        let s2 = Shortcut(keyCode: UInt32(kVK_Space),
+                          modifiers: UInt32(controlKey) | UInt32(optionKey))
+        #expect(s2.description == "⌃⌥Space")
     }
 
-    @Test func comboLookupByMaskRoundTrips() {
-        for combo in ModifierCombo.all {
-            #expect(ModifierCombo.combo(forMask: combo.mask)?.title == combo.title)
-        }
+    @Test func keyNameFallsBackForUnknownCodes() {
+        #expect(KeyCodes.name(for: UInt32(kVK_ANSI_A)) == "A")
+        #expect(KeyCodes.name(for: UInt32(kVK_F5)) == "F5")
+        #expect(KeyCodes.name(for: 9999).hasPrefix("Key "))
+    }
+
+    @Test func defaultShortcutIsCommandShiftA() {
+        #expect(Shortcut.default.description == "⇧⌘A")
     }
 
     @MainActor
@@ -79,16 +87,22 @@ struct RapidClickerTests {
     }
 
     @MainActor
-    @Test func autoStopCountClampsToRange() {
+    @Test func autoStopValueClampsAndComputesDuration() {
         let model = ClickerModel()
 
-        model.autoStopCount = 1000
-        #expect(model.autoStopCount == 1000)
+        model.autoStopUnit = .seconds
+        model.autoStopValue = 30
+        #expect(model.autoStopValue == 30)
+        #expect(model.autoStopDuration == 30)
 
-        model.autoStopCount = 0
-        #expect(model.autoStopCount == ClickerModel.autoStopRange.lowerBound)
+        model.autoStopUnit = .minutes
+        #expect(model.autoStopDuration == 30 * 60)
 
-        model.autoStopCount = 9_999_999
-        #expect(model.autoStopCount == ClickerModel.autoStopRange.upperBound)
+        // Out-of-range values clamp (without recursing).
+        model.autoStopValue = 0
+        #expect(model.autoStopValue == ClickerModel.autoStopValueRange.lowerBound)
+
+        model.autoStopValue = 100_000
+        #expect(model.autoStopValue == ClickerModel.autoStopValueRange.upperBound)
     }
 }

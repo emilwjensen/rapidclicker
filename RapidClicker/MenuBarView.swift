@@ -41,9 +41,12 @@ struct MenuBarView: View {
 
             VStack(spacing: 4) {
                 row("Rate", "\(model.roundedRate)/sec")
-                row("Hotkey", model.hotKeyDescription)
+                row("Hotkey", model.shortcut.description)
                 if model.autoStopEnabled {
-                    row("Auto-stop", "\(model.autoStopCount)")
+                    row("Auto-stop", model.autoStopDescription)
+                }
+                if model.isRunning, let remaining = model.secondsRemaining {
+                    row("Time left", "\(remaining)s")
                 }
                 if model.clicksSent > 0 {
                     row("Sent", "\(model.clicksSent)")

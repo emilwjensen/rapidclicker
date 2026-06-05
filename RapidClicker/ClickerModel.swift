@@ -12,6 +12,14 @@ import Carbon
 import Observation
 import ApplicationServices
 
+/// Unit for the time-based auto-stop duration.
+enum AutoStopUnit: String, CaseIterable, Identifiable {
+    case seconds, minutes
+    var id: String { rawValue }
+    var label: String { self == .seconds ? "seconds" : "minutes" }
+    var factor: Int { self == .seconds ? 1 : 60 }
+}
+
 @Observable
 final class ClickerModel {
 
@@ -22,6 +30,9 @@ final class ClickerModel {
 
     /// Clicks sent in the current run (live; resets each time clicking starts).
     private(set) var clicksSent = 0
+
+    /// Seconds left before the time-based auto-stop fires (nil if not applicable).
+    private(set) var secondsRemaining: Int?
 
     /// Seconds between synthesized clicks (kept within `intervalRange`).
     var interval: TimeInterval {
@@ -39,32 +50,32 @@ final class ClickerModel {
         }
     }
 
-    /// Carbon modifier mask for the global hotkey (always includes Shift).
-    var modifierMask: UInt32 {
-        didSet { persistAndRegisterHotKey() }
-    }
+    /// The global hotkey. Change it via `setShortcut(keyCode:modifiers:)`.
+    private(set) var shortcut: Shortcut
 
-    /// Uppercase letter ("A"–"Z") for the global hotkey.
-    var keyLetter: String {
-        didSet { persistAndRegisterHotKey() }
-    }
+    /// Set when a requested shortcut couldn't be registered (e.g. already in use).
+    var shortcutError: String?
 
-    /// Whether clicking should stop automatically after `autoStopCount` clicks.
+    /// Whether clicking should stop automatically after a set duration.
     var autoStopEnabled: Bool {
         didSet { defaults.set(autoStopEnabled, forKey: Keys.autoStopEnabled) }
     }
 
-    /// Number of clicks after which clicking stops (when `autoStopEnabled`).
-    var autoStopCount: Int {
+    /// The auto-stop duration value (paired with `autoStopUnit`).
+    var autoStopValue: Int {
         didSet {
-            // Guard the clamp re-assignment against @Observable setter recursion.
-            let clamped = min(max(autoStopCount, Self.autoStopRange.lowerBound), Self.autoStopRange.upperBound)
-            if autoStopCount != clamped {
-                autoStopCount = clamped
+            let clamped = min(max(autoStopValue, Self.autoStopValueRange.lowerBound), Self.autoStopValueRange.upperBound)
+            if autoStopValue != clamped {
+                autoStopValue = clamped
                 return
             }
-            defaults.set(autoStopCount, forKey: Keys.autoStopCount)
+            defaults.set(autoStopValue, forKey: Keys.autoStopValue)
         }
+    }
+
+    /// The unit for `autoStopValue` (seconds or minutes).
+    var autoStopUnit: AutoStopUnit {
+        didSet { defaults.set(autoStopUnit.rawValue, forKey: Keys.autoStopUnit) }
     }
 
     /// Whether the app has been granted Accessibility permission.
@@ -75,12 +86,15 @@ final class ClickerModel {
     /// User-facing click-rate range, in clicks per second.
     static let rateRange: ClosedRange<Double> = 1...200
 
-    /// Allowed range for the auto-stop click count.
-    static let autoStopRange: ClosedRange<Int> = 1...1000
+    /// Allowed range for the auto-stop duration value.
+    static let autoStopValueRange: ClosedRange<Int> = 1...999
 
     /// Allowed interval range (seconds), derived from `rateRange`.
     static let intervalRange: ClosedRange<TimeInterval> =
         (1.0 / rateRange.upperBound)...(1.0 / rateRange.lowerBound)
+
+    /// The auto-stop duration in seconds.
+    var autoStopDuration: TimeInterval { TimeInterval(autoStopValue * autoStopUnit.factor) }
 
     // MARK: - Collaborators
 
@@ -88,13 +102,17 @@ final class ClickerModel {
     @ObservationIgnored private let hotKey = HotKeyManager()
     @ObservationIgnored private let defaults = UserDefaults.standard
     @ObservationIgnored private var displayTimer: Timer?
+    @ObservationIgnored private var autoStopTimer: Timer?
+    @ObservationIgnored private var runEndDate: Date?
 
     private enum Keys {
         static let modifiers = "savedModifiers"
-        static let key = "savedKey"
+        static let key = "savedKey"          // legacy: A–Z letter
+        static let keyCode = "savedKeyCode"
         static let interval = "savedInterval"
         static let autoStopEnabled = "autoStopEnabled"
-        static let autoStopCount = "autoStopCount"
+        static let autoStopValue = "autoStopValue"
+        static let autoStopUnit = "autoStopUnit"
     }
 
     // MARK: - Init
@@ -102,25 +120,29 @@ final class ClickerModel {
     init() {
         let defaults = UserDefaults.standard
 
-        // Seed a default ⌘+⇧+A hotkey on first launch.
-        if defaults.string(forKey: Keys.key) == nil {
-            defaults.set(Int(UInt32(cmdKey) | UInt32(shiftKey)), forKey: Keys.modifiers)
-            defaults.set("A", forKey: Keys.key)
-        }
-
         let savedInterval = defaults.object(forKey: Keys.interval) as? TimeInterval ?? 0.01
         interval = min(max(savedInterval, Self.intervalRange.lowerBound), Self.intervalRange.upperBound)
-        modifierMask = UInt32(defaults.integer(forKey: Keys.modifiers))
-        keyLetter = defaults.string(forKey: Keys.key) ?? "A"
 
-        // Auto-stop defaults to on, after 1000 clicks.
+        // Load the saved shortcut, migrating from the old letter-based format.
+        let savedMods = UInt32(defaults.integer(forKey: Keys.modifiers))
+        if defaults.object(forKey: Keys.keyCode) != nil {
+            shortcut = Shortcut(keyCode: UInt32(defaults.integer(forKey: Keys.keyCode)), modifiers: savedMods)
+        } else if let letter = defaults.string(forKey: Keys.key),
+                  let code = KeyCodes.code(for: letter), savedMods != 0 {
+            shortcut = Shortcut(keyCode: code, modifiers: savedMods)
+        } else {
+            shortcut = .default
+        }
+
+        // Auto-stop defaults to on, after 30 seconds.
         autoStopEnabled = defaults.object(forKey: Keys.autoStopEnabled) as? Bool ?? true
-        let savedStop = defaults.object(forKey: Keys.autoStopCount) as? Int ?? 1000
-        autoStopCount = min(max(savedStop, Self.autoStopRange.lowerBound), Self.autoStopRange.upperBound)
+        let savedValue = defaults.object(forKey: Keys.autoStopValue) as? Int ?? 30
+        autoStopValue = min(max(savedValue, Self.autoStopValueRange.lowerBound), Self.autoStopValueRange.upperBound)
+        autoStopUnit = AutoStopUnit(rawValue: defaults.string(forKey: Keys.autoStopUnit) ?? "") ?? .seconds
 
         hotKey.onTrigger = { [weak self] in self?.toggle() }
-        registerHotKey()
-        clicker.onLimitReached = { [weak self] in self?.handleAutoStop() }
+        _ = hotKey.register(modifiers: shortcut.modifiers, keyCode: shortcut.keyCode)
+        persistShortcut()
 
         // Re-check Accessibility status whenever the app comes forward, so the
         // UI updates after the user grants permission in System Settings.
@@ -136,31 +158,49 @@ final class ClickerModel {
 
     /// Starts or stops clicking.
     func toggle() {
-        if isRunning {
-            clicker.stop()
-            stopDisplayUpdates()
+        if isRunning { stopClicking() } else { startClicking() }
+    }
+
+    private func startClicking() {
+        clicker.resetCount()
+        clicksSent = 0
+        clicker.start(interval: interval)
+
+        if autoStopEnabled {
+            let duration = autoStopDuration
+            runEndDate = Date().addingTimeInterval(duration)
+            secondsRemaining = Int(duration.rounded())
+            autoStopTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
+                self?.stopClicking()
+            }
         } else {
-            clicker.resetCount()
-            clicksSent = 0
-            clicker.clickLimit = autoStopEnabled ? autoStopCount : nil
-            clicker.start(interval: interval)
-            startDisplayUpdates()
+            runEndDate = nil
+            secondsRemaining = nil
         }
-        isRunning = clicker.isRunning
+
+        startDisplayUpdates()
+        isRunning = true
     }
 
-    /// Called on the main thread when the engine hits the auto-stop limit.
-    private func handleAutoStop() {
+    private func stopClicking() {
+        clicker.stop()
+        autoStopTimer?.invalidate()
+        autoStopTimer = nil
+        runEndDate = nil
+        secondsRemaining = nil
         stopDisplayUpdates()
-        isRunning = clicker.isRunning
+        isRunning = false
     }
 
-    /// Polls the engine a few times a second to surface a live click count.
+    /// Polls the engine a few times a second to surface a live click count and countdown.
     private func startDisplayUpdates() {
         displayTimer?.invalidate()
         displayTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.clicksSent = self.clicker.currentCount()
+            if let end = self.runEndDate {
+                self.secondsRemaining = max(0, Int(end.timeIntervalSinceNow.rounded(.up)))
+            }
         }
     }
 
@@ -186,9 +226,9 @@ final class ClickerModel {
 
     var intervalDescription: String { String(format: "%.3f s", interval) }
 
-    var hotKeyDescription: String {
-        let modifiers = ModifierCombo.combo(forMask: modifierMask)?.title ?? "?"
-        return "\(modifiers)+\(keyLetter)"
+    /// e.g. "30 seconds" / "5 minutes".
+    var autoStopDescription: String {
+        "\(autoStopValue) \(autoStopValue == 1 ? String(autoStopUnit.label.dropLast()) : autoStopUnit.label)"
     }
 
     // MARK: - Accessibility
@@ -206,16 +246,30 @@ final class ClickerModel {
         }
     }
 
-    // MARK: - Hotkey plumbing
+    // MARK: - Hotkey
 
-    private func persistAndRegisterHotKey() {
-        defaults.set(Int(modifierMask), forKey: Keys.modifiers)
-        defaults.set(keyLetter, forKey: Keys.key)
-        registerHotKey()
+    /// Tries to adopt a new global hotkey. If it can't be registered (e.g. the
+    /// combo is already taken), keeps the existing one and reports an error.
+    func setShortcut(keyCode: UInt32, modifiers: UInt32) {
+        let candidate = Shortcut(keyCode: keyCode, modifiers: modifiers)
+        guard candidate != shortcut else { shortcutError = nil; return }
+
+        if hotKey.register(modifiers: modifiers, keyCode: keyCode) {
+            shortcut = candidate
+            persistShortcut()
+            shortcutError = nil
+        } else {
+            // Re-register the previous shortcut so we still have a working hotkey.
+            _ = hotKey.register(modifiers: shortcut.modifiers, keyCode: shortcut.keyCode)
+            shortcutError = "“\(candidate.description)” is unavailable — it may already be in use."
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+                self?.shortcutError = nil
+            }
+        }
     }
 
-    private func registerHotKey() {
-        guard let keyCode = KeyCodes.code(for: keyLetter) else { return }
-        hotKey.register(modifiers: modifierMask, keyCode: keyCode)
+    private func persistShortcut() {
+        defaults.set(Int(shortcut.modifiers), forKey: Keys.modifiers)
+        defaults.set(Int(shortcut.keyCode), forKey: Keys.keyCode)
     }
 }

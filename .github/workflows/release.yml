@@ -1,0 +1,30 @@
+name: Release
+
+# Push a tag like v1.1.0 to build the styled DMG and publish a GitHub Release.
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build-dmg:
+    name: Build & publish DMG
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install DMG tooling
+        run: |
+          brew install create-dmg
+          python3 -m pip install --break-system-packages pillow \
+            || python3 -m pip install pillow
+
+      - name: Build RapidClicker.dmg
+        run: ./scripts/build_dmg.sh
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: RapidClicker.dmg
+          generate_release_notes: true

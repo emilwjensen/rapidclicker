@@ -30,10 +30,10 @@ struct ContentView: View {
         )
         let rateBounds = Int(ClickerModel.rateRange.lowerBound)...Int(ClickerModel.rateRange.upperBound)
 
-        // Whole-number auto-stop count for its text field.
-        let stopCount = Binding<Int>(
-            get: { model.autoStopCount },
-            set: { model.autoStopCount = $0 }
+        // Whole-number auto-stop duration value for its text field.
+        let stopValue = Binding<Int>(
+            get: { model.autoStopValue },
+            set: { model.autoStopValue = $0 }
         )
 
         VStack(spacing: 18) {
@@ -74,41 +74,48 @@ struct ContentView: View {
                 HStack(spacing: 8) {
                     Toggle("Stop after", isOn: $model.autoStopEnabled)
                         .toggleStyle(.checkbox)
-                    TextField("", value: stopCount, format: .number)
+                    TextField("", value: stopValue, format: .number)
                         .textFieldStyle(.roundedBorder)
                         .multilineTextAlignment(.trailing)
-                        .frame(width: 72)
+                        .frame(width: 56)
                         .focused($focusedField, equals: .limit)
                         .onSubmit { focusedField = nil }
                         .disabled(!model.autoStopEnabled)
-                    Text("clicks")
-                        .foregroundStyle(model.autoStopEnabled ? .primary : .secondary)
+                    Picker("", selection: $model.autoStopUnit) {
+                        ForEach(AutoStopUnit.allCases) { unit in
+                            Text(unit.label).tag(unit)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 104)
+                    .disabled(!model.autoStopEnabled)
                     Spacer()
                 }
                 .padding(4)
             } label: {
-                Label("Auto-stop", systemImage: "stop.circle")
+                Label("Auto-stop", systemImage: "timer")
             }
 
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Picker("Modifiers", selection: $model.modifierMask) {
-                            ForEach(ModifierCombo.all, id: \.mask) { combo in
-                                Text(combo.title).tag(combo.mask)
-                            }
-                        }
-                        Picker("Key", selection: $model.keyLetter) {
-                            ForEach(KeyCodes.letters, id: \.self) { letter in
-                                Text(letter).tag(letter)
-                            }
+                        Text("Shortcut")
+                        Spacer()
+                        ShortcutRecorderView(current: model.shortcut.description) { keyCode, modifiers in
+                            model.setShortcut(keyCode: keyCode, modifiers: modifiers)
                         }
                     }
-                    .labelsHidden()
 
-                    Text("Press \(Text(model.hotKeyDescription).bold()) anywhere to start or stop.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                    if let error = model.shortcutError {
+                        Text(error)
+                            .font(.callout)
+                            .foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("Press \(Text(model.shortcut.description).bold()) anywhere to start or stop.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .padding(4)
             } label: {
@@ -173,9 +180,15 @@ struct ContentView: View {
         }
     }
 
-    /// Status text: live count while running, the last run's total once stopped.
+    /// Status text: live count (and countdown) while running, last total once stopped.
     private var statusText: String {
-        if model.isRunning { return "Clicking — \(model.clicksSent) sent" }
+        if model.isRunning {
+            var text = "Clicking — \(model.clicksSent) sent"
+            if let remaining = model.secondsRemaining {
+                text += " · \(remaining)s left"
+            }
+            return text
+        }
         if model.clicksSent > 0 { return "Stopped — \(model.clicksSent) sent" }
         return "Idle"
     }

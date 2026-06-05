@@ -2,10 +2,16 @@
 
 A lightweight native **macOS auto-clicker**. Set a click rate, pick a global
 hotkey, and RapidClicker repeatedly clicks the left mouse button at your cursor —
-until you stop it, or until it hits your auto-stop limit.
+until you stop it, or until your auto-stop timer runs out.
 
 <p align="center">
   <img src="RapidClicker/Assets.xcassets/AppIcon.appiconset/256-mac.png" width="128" alt="RapidClicker icon">
+</p>
+
+<p align="center">
+  <a href="https://github.com/emilwjensen/rapidclicker/actions/workflows/ci.yml">
+    <img src="https://github.com/emilwjensen/rapidclicker/actions/workflows/ci.yml/badge.svg" alt="CI status">
+  </a>
 </p>
 
 ## Download & install
@@ -36,10 +42,10 @@ For a detailed walkthrough and troubleshooting, see [INSTALL.md](INSTALL.md).
 
 - **Set the speed in clicks per second** — drag the slider (1–200 CPS) or type an
   exact value. The interval in seconds is shown as a secondary readout.
-- **Auto-stop** — stop automatically after a set number of clicks (on by default,
-  1000, max 1000), or turn it off to run until you stop it.
-- **Global hotkey toggle** — start/stop from anywhere without switching apps.
-  Pick a modifier combo (`⌘+⇧`, `⌥+⇧`, or `⌘+⌥+⇧`) plus a letter `A`–`Z`.
+- **Time-based auto-stop** — stop automatically after a set duration in seconds or
+  minutes (on by default), with a live countdown, or turn it off to run until you stop it.
+- **Recordable global hotkey** — click *record* and press any combination (using
+  `⌘`, `⌥`, or `⌃`) to toggle start/stop from anywhere. Warns if the combo is taken.
 - **Window + menu bar** — a main window and a menu-bar item, sharing one state.
   Close the window and the app keeps living in the menu bar.
 - **Live feedback** — a pulsing indicator and a running "clicks sent" count while
@@ -53,9 +59,9 @@ For a detailed walkthrough and troubleshooting, see [INSTALL.md](INSTALL.md).
 
 1. Launch RapidClicker and grant Accessibility permission when prompted.
 2. Set the **clicks per second** (slider, text field, or stepper).
-3. (Optional) Adjust **Auto-stop**, or uncheck it to click indefinitely.
-4. (Optional) Pick a **modifier + key** for the global hotkey — it applies
-   immediately.
+3. (Optional) Set the **Auto-stop** duration, or uncheck it to click indefinitely.
+4. (Optional) Click **record** next to *Shortcut* and press the key combination
+   you want for the global hotkey.
 5. Click **Start** (or press your hotkey) to begin; **Stop** (or the hotkey
    again) to end.
 
@@ -69,25 +75,28 @@ For a detailed walkthrough and troubleshooting, see [INSTALL.md](INSTALL.md).
 > App Sandbox** (it posts system-wide events), so it is not eligible for the Mac
 > App Store — see [`RapidClicker.entitlements`](RapidClicker/RapidClicker.entitlements).
 
-Run the unit tests with **⌘U** (or `xcodebuild test`). They cover the key-code
-map, modifier combos, the `FourCharCode` helper, and the speed/auto-stop clamping.
+Run the unit tests with **⌘U** (or `xcodebuild test`). They cover the shortcut
+descriptions, key-name lookup, the `FourCharCode` helper, and the speed /
+auto-stop clamping. CI runs the same tests on every push.
 
 ## Project structure
 
 ```
 RapidClicker/
-├── RapidClickerApp.swift   @main entry point; Window + MenuBarExtra scenes
-├── ContentView.swift       Main window UI (speed, auto-stop, hotkey, start/stop)
-├── MenuBarView.swift       Menu-bar popover UI
-├── ClickerModel.swift      @Observable state: settings, engine, permissions
-├── AutoClicker.swift       Dispatch-timer click engine (with click limit)
-├── HotKeyManager.swift     Carbon global-hotkey registration
-├── KeyCodes.swift          Letter↔key-code map, modifier combos, FourCharCode
-├── Assets.xcassets/        App icon & accent color
-├── Info.plist              Bundle configuration
+├── RapidClickerApp.swift     @main entry point; Window + MenuBarExtra scenes
+├── ContentView.swift         Main window UI (speed, auto-stop, hotkey, start/stop)
+├── MenuBarView.swift         Menu-bar popover UI
+├── ShortcutRecorderView.swift  Records a global hotkey from a key press
+├── ClickerModel.swift        @Observable state: settings, engine, permissions
+├── AutoClicker.swift         Dispatch-timer click engine
+├── HotKeyManager.swift       Carbon global-hotkey registration
+├── KeyCodes.swift            Shortcut model + key-name / modifier-symbol helpers
+├── Assets.xcassets/          App icon & accent color
+├── Info.plist                Bundle configuration
 └── RapidClicker.entitlements
-RapidClickerTests/          Unit tests (Swift Testing)
-RapidClickerUITests/        UI test stubs (XCTest)
+RapidClickerTests/            Unit tests (Swift Testing)
+scripts/                      DMG build tooling (background + create-dmg)
+.github/workflows/            CI (build + test) and Release (DMG on tag)
 ```
 
 ### How it works
@@ -104,8 +113,7 @@ RapidClickerUITests/        UI test stubs (XCTest)
 
 ## License
 
-No license has been specified yet. All rights reserved by the author unless a
-`LICENSE` file is added.
+Released under the [MIT License](LICENSE).
 
 ---
 

@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Build & test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build and run unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project RapidClicker.xcodeproj \
+            -scheme RapidClicker \
+            -destination 'platform=macOS' \
+            -only-testing:RapidClickerTests \
+            CODE_SIGNING_ALLOWED=NO
